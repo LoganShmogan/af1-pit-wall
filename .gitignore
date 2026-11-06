@@ -5,3 +5,5 @@ test/build/
 # Vendor files and copyrighted media stay local (see docs/assets.md)
 vendor/
 *.7z
+# Map tool downloads (OpenF1 laps used to fit the maps)
+tools/.cache/

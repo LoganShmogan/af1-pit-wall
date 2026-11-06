@@ -35,6 +35,8 @@ inline void delay(uint32_t ms) { fake_millis += ms; }
 inline void pinMode(int, int) {}
 inline void digitalWrite(int pin, int v) { fake_pins[pin] = v; }
 inline void *ps_malloc(size_t n) { return malloc(n); }
+#define PROGMEM
+#define pgm_read_byte(p) (*(const uint8_t *)(p))
 template <typename T> T constrain(T v, T lo, T hi) { return v < lo ? lo : v > hi ? hi : v; }
 
 // esp32-hal-time
@@ -102,3 +104,6 @@ public:
     return false;
   }
 };
+
+// PNGdec reads its tables with memcpy_P (flash) on the ESP32
+#define memcpy_P memcpy

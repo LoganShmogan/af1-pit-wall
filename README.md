@@ -3,18 +3,35 @@
 A three-screen live Formula 1 dashboard on ESP32-S3 boards (LCDwiki ES3C35P, 3.5" 480x320), mounted on
 a 3D-printed pit-wall stand. Left: standings. Middle: live track map. Right: race drama and sound.
 
-Status: **Phase 1 (build guide Jobs 3–5)**. Shared library and a replay test sketch. Compiles; not yet
-run on the boards. See [docs/build-guide.md](docs/build-guide.md) for the full plan.
+Status: **all three boards, version 1**, running on a replay of the latest finished race. Everything
+compiles and passes its tests; none of it has run on the real boards yet. See
+[docs/build-guide.md](docs/build-guide.md) for the full plan.
+
+## One folder per board
+
+Each board has its own sketch folder. Open the folder's `.ino` in the Arduino IDE and upload it to that board.
+
+| Folder | Board | Shows |
+| --- | --- | --- |
+| [StandingsBoard/](StandingsBoard/) | left | running order, gaps, tyres, top-3 feature, driver cards |
+| [MapBoard/](MapBoard/) | middle | the circuit map with every car moving, podium/battle rings, crash and safety car markers |
+| [DramaBoard/](DramaBoard/) | right | lap, track status, the fight for the lead, fastest lap/pit, weather, news feed, incident cards |
+| [CheckpointA/](CheckpointA/) | any | test sketch: NZ clock + replayed lap count |
+
+Each folder's README has what it shows, the touch controls and its upload settings. All three boards
+read the same race through the shared `AF1` library. Each works out the replay moment from the
+internet clock, so they show the same moment without talking to each other.
 
 ```
-AF1/                    shared Arduino library, used by every board sketch
+AF1/                    shared Arduino library, used by every board
   src/AF1.h             everything a sketch can call
   src/AF1.cpp           screen (ST77922 init), touch (tap/hold/swipe), wifi + NZ clock
-  src/F1Data.cpp        OpenF1 replay: session, drivers, lap count, running order
+  src/F1Data.cpp        OpenF1 replay: laps, order, tyres, gaps, pits, race control, weather, car x/y, news
   src/secrets.example.h copy to secrets.h (git-ignored) with the home wifi
-CheckpointA/            test sketch: NZ clock + replayed race lap count
-test/                   host unit tests (fakes for Arduino/WiFi/HTTP), 100% line + branch gate
+assets/maps/            the 23 signed-off season maps (PNG)
+tools/build_maps.py     turns the maps into MapBoard/src and fits each one to OpenF1's car positions
 tools/probe_f1_live.sh  shows which F1 live-timing topics are free right now
+test/                   host unit tests (fakes for Arduino/WiFi/HTTP), 100% line + branch gate
 docs/                   build guide, hardware notes, data sources, assets, history
 ```
 
@@ -22,40 +39,37 @@ docs/                   build guide, hardware notes, data sources, assets, histo
 
 1. `cp AF1/src/secrets.example.h AF1/src/secrets.h` and fill in the 2.4 GHz wifi.
 2. Link the library into the sketchbook: `ln -s "$PWD/AF1" ~/Arduino/libraries/AF1`
-3. Libraries: GFX Library for Arduino 1.6.9, ArduinoJson 7.4.x. Board settings are in
-   [docs/hardware.md](docs/hardware.md#arduino-settings-all-boards).
+3. Libraries: GFX Library for Arduino 1.6.9, ArduinoJson 7.4.x, PNGdec 1.1.6 (map board). Board
+   settings are in [docs/hardware.md](docs/hardware.md#arduino-settings-all-boards). The map board also
+   needs Partition Scheme = **Custom**.
 
-## Checkpoint A
-
-Open `CheckpointA/CheckpointA.ino`, set `BOARD_NAME`, and upload. You should see:
-
-- the NZ time and date;
-- "Loading race data..." for about 10 s;
-- the latest finished race (e.g. "Mexico City - Race");
-- "On the grid", then "Lap 1 / 71" ticking at real speed with the top 3.
-
-Tap = replay speed 1x / 10x / 60x. Hold = restart. Serial Monitor (115200) logs every OpenF1 request.
+To update a board later, change only its folder and upload that one sketch. To change something all
+three boards share (data, wifi, touch), edit `AF1/` and upload all three.
 
 ## Tests
 
 ```
-make -C test
+make -C test            # everything
+make -C test map        # or: lib, standings, drama
 ```
 
-Builds the library and the sketch on your PC against small fakes in `test/fakes/`, then runs 183 checks.
+Builds the library and each board on your PC against small fakes in `test/fakes/` and runs the checks.
 It fails unless every line and every branch ran (C++ exception paths aren't counted). Needs g++ and
-python3; ArduinoJson comes from `~/Arduino/libraries` (set `ARDUINOJSON=` to change that). CI runs
-the tests and an ESP32 compile on every push.
+python3; ArduinoJson and PNGdec come from `~/Arduino/libraries` (set `ARDUINOJSON=` / `PNGDEC=` to
+change that). CI runs the tests and compiles every sketch for the ESP32 on every push.
 
 ## Data
 
 Testing uses OpenF1's free history. For live races, F1's own timing feed is free except for car
 positions on track. See [docs/data-sources.md](docs/data-sources.md) for the options the maker needs to pick from.
+The free tier allows about 30 requests a minute for the whole house. At replay speed 1, the three
+boards together use about 7.
 
-## Not in yet (added with the job that needs it)
+## Not in yet
 
-- `settings` (Preferences) – Job 10. `link` (ESP-NOW; switch wifi to AP_STA) – Job 15.
-- Tyres, intervals, pits, race control, weather – Jobs 8, 12, 17.
-- Live data source – Job 24.
+- Sound playback on the drama board (Job 16). It already picks the right clip and logs it.
+- Board-to-board link (ESP-NOW): pinning from the standings board, the synced idle show (Jobs 15, 21).
+- Map layers menu, pin halos and follow-zoom (Jobs 10, 11); driver photos (Job 13).
+- Practice and qualifying views (Job 22); live data source (Job 24).
 
 Code: [MIT licence](LICENSE). Credits: [CREDITS.md](CREDITS.md). Personal, non-commercial project, not affiliated with Formula 1.

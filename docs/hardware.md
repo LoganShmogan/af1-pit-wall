@@ -67,5 +67,5 @@ Red and blue came out right on all boards. If a future board shows them swapped,
 | Job 1 – name + RGB colour test | Passed on all 3 boards, no colour swap |
 | Job 2 – touch dot + 4 corner targets | Passed, no flips |
 | Albert Park map test (RGB565 header) | Displayed correctly |
-| Map Board v1 – all 23 maps as PNG, tap/swipe | Compiles (3.1 MB); not yet run on a board |
+| Map Board v1 – all 23 maps as PNG, tap/swipe | Would have failed: PNGdec 1.1.6 can't decode a 480-wide colour PNG (its line buffer is too small), so maps are now stored as left/right halves. Replaced by `MapBoard/` |
 | Job 3 wifi clock, v1 Foundation (replay) | Compiles; not yet run. Replaced by `AF1` + `CheckpointA` |

@@ -79,7 +79,7 @@ void setup()
   char host[24];
   snprintf(host, sizeof(host), "af1-%s", BOARD_NAME);
   af1NetBegin(host);
-  f1Begin(SESSION_KEY, SPEEDS[speedIdx]);
+  f1Begin(SESSION_KEY, SPEEDS[speedIdx], F1_POSITIONS | F1_LAPS);
 }
 
 void loop()

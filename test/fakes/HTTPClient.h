@@ -7,6 +7,7 @@ struct FakeReply { int code; std::string body; };
 extern std::vector<std::pair<std::string, FakeReply>> fake_routes; // first match wins
 extern std::vector<std::string> fake_requests;                     // every URL asked for
 extern bool fake_http_begin_ok;
+extern void (*fake_on_get)(); // called during GET(), e.g. to change state mid-download
 
 struct HTTPClient
 {
@@ -22,6 +23,7 @@ struct HTTPClient
   int GET()
   {
     fake_requests.push_back(url);
+    if (fake_on_get) fake_on_get();
     for (auto &r : fake_routes)
       if (url.find(r.first) != std::string::npos)
       {

@@ -5,7 +5,7 @@ They aren't committed because they're large, someone else's copyright, or both.
 
 | Asset | Where now | Why not in git | Used by |
 | --- | --- | --- | --- |
-| 23 season maps v4 (PNG) | `Programs/MAP-Board/MapBoard/src/mapNN.cpp` (as PNG arrays), v4 zip | Our own art, but about 9 MB of generated source. Bring in with Job 6 as PNGs plus a converter script | Map board |
+| 23 season maps v4 (PNG) | `assets/maps/` (in this repo); `tools/build_maps.py` turns them into `MapBoard/src/` | In git | Map board |
 | Driver headshots (22) and team cars (11) | `f1-driver-photos.zip`, `f1-driver-car-images.zip` | Formula 1 / team copyright | Standings, drama |
 | Sound effects (WAV) | `f1-dashboard-sounds-…/` | Fine to share (see CREDITS.md); convert to MP3 first (Job 16) | Drama |
 | Ryan commentary (31 MP3) | `Commentary/` | Fine to share; add with Job 18 | Drama |
