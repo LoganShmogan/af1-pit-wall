@@ -1,0 +1,7 @@
+# Wifi password - never commit. Copy AF1/src/secrets.example.h to make it.
+AF1/src/secrets.h
+# Test build output
+test/build/
+# Vendor files and copyrighted media stay local (see docs/assets.md)
+vendor/
+*.7z
