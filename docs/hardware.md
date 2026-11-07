@@ -71,7 +71,8 @@ Red and blue came out right on all boards. If a future board shows them swapped,
 | Job 3 wifi clock, v1 Foundation (replay) | Never run; replaced by `AF1` + `CheckpointA` |
 | MapBoard on the middle board (7 Nov 2026) | Runs: the right map, cars on the track, red-flag stop shown correctly; full Mexico replay loads in about 25 s, car positions keep up at 1x |
 | StandingsBoard on the left board (7 Nov 2026) | Runs: list, gaps, tyres and driver cards checked on screen; loads in about 16 s |
-| DramaBoard on the right board (7 Nov 2026) | Runs after a router restart (see below); all three boards show the same replay moment |
+| DramaBoard on the right board (7 Nov 2026) | Runs once the wifi transmit power was lowered (see below); all three boards show the same replay moment |
+| Full replay test, all three on mains power (7 Nov 2026) | See [tests/2026-11-07-full-replay-test.md](tests/2026-11-07-full-replay-test.md) |
 
 ## Network lessons from the real board
 
@@ -89,5 +90,5 @@ Red and blue came out right on all boards. If a future board shows them swapped,
 | "Sketch too big" / "text section exceeds available space" (map board) | Default partition only has 1.3 MB for the program; the maps need 3.9 MB | Tools > Partition Scheme > **Custom**, Flash Size > **16MB** |
 | Black screen and silent serial right after flashing or reading the board with `esptool` | The S3 stayed in download mode; a USB "RTS" reset doesn't bring it out | Press the board's RST button, or `esptool --port /dev/ttyACM0 --after watchdog-reset chip-id` |
 | Port is `/dev/ttyACM1` instead of `ttyACM0` | The old port was still held when the board came back | Pick the new port in Tools > Port |
-| Serial says "Wifi: still down, trying again" forever, signal fine | The router refuses the board (disconnect reason 2, "auth expired") | Restart the router; check it isn't blocking new devices (MAC filter, device limit) |
+| Serial says "Wifi: still down, trying again" forever, signal fine | The router refuses the board (disconnect reason 2, "auth expired"): one board's radio at full transmit power | Fixed in `AF1`: transmit power is set to 8.5 dBm. If it happens anyway, restart the router and check it isn't blocking new devices |
 | Serial log | 115200 baud | Every OpenF1 request and the "Loaded …" summary are printed |

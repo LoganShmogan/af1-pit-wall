@@ -5,6 +5,7 @@
 #define WL_CONNECTED 3
 #define WL_DISCONNECTED 6
 #define WIFI_STA 1
+#define WIFI_POWER_8_5dBm 34
 
 struct FakeIP
 {
@@ -20,6 +21,8 @@ struct FakeWiFi
   void setHostname(const char *h) { hostname = h; }
   void setAutoReconnect(bool) {}
   void setSleep(bool) {}
+  int txPower = 0;
+  void setTxPower(int p) { txPower = p; }
   void begin(const char *, const char *) { begins++; }
   void disconnect() { disconnects++; }
   int status() { return st; }

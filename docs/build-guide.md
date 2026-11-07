@@ -368,7 +368,7 @@ The biggest risk is the live data source; everything else can be built and teste
 | Slow link to OpenF1 (350 ms from NZ) | Solved | Replies are gzip-compressed (15–30x smaller); a full race loads in about 25 s |
 | ST77922 only works with LCDwiki code | Solved | Wrapped once in the `AF1` library |
 | Smooth car movement on a 3.5 in screen | Low | PSRAM frame buffer, positions smoothed between samples; check on the board |
-| Router refusing a board (wifi "reason 2") | Low | Happened once on the drama board; restarting the router fixed it |
+| Router refusing a board (wifi "reason 2") | Solved | The drama board's radio at full power; all boards now transmit at 8.5 dBm |
 | Audio overlapping (two events at once) | Low | Simple queue with priorities: crash > safety car > lead change > others |
 | Heat inside the stand | Low | Rear vents already in v14 |
 

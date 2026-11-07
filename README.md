@@ -54,7 +54,9 @@ Open the board's folder (e.g. `MapBoard/MapBoard.ino`), plug that board in, then
 | Partition Scheme | Default; **Custom** for the map board |
 | Port | /dev/ttyACM0 (or ttyACM1) |
 
-Upload. The board joins the wifi, loads the race in about 20 s and starts the replay. Serial Monitor
+Upload. The board joins the wifi, loads the race in about 20 s and starts the replay.
+To start all three from the grid at the same moment (a test run), see
+[the full replay test](docs/tests/2026-11-07-full-replay-test.md#how-the-boards-were-flashed). Serial Monitor
 (115200) shows each step. If something goes wrong, see
 [troubleshooting](docs/hardware.md#flashing-and-troubleshooting).
 

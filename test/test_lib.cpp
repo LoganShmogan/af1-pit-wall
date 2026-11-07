@@ -136,6 +136,7 @@ static void test_net()
   fake_tz_calls = 0;
   af1NetBegin("af1-test");
   CHECK_STR(WiFi.hostname, "af1-test");
+  CHECK_EQ(WiFi.txPower, WIFI_POWER_8_5dBm); // one board is only let in at lower power
   CHECK_EQ(WiFi.begins, 1);
   CHECK(!af1WifiOk());
 
@@ -436,6 +437,33 @@ static void test_replay_sync()
   loadAll();
   CHECK(race.ready);
   CHECK_EQ(race.endMs, START + 30 * 60000);
+}
+
+// A test run: every board holds the grid until a set time, then races from the start together
+static void test_start_at()
+{
+  resetFakes();
+  routeRace();
+  f1Begin(0, 1, F1_LAPS);
+  int64_t go = (int64_t)NOV7 * 1000 + 60000; // a minute from now
+  f1StartAt(go);                              // set before the race has loaded
+  loadAll();
+  f1Tick();
+  CHECK_EQ(race.clockMs, START); // holding the grid
+  fake_millis += 30000;
+  f1Tick();
+  CHECK_EQ(race.clockMs, START);
+  fake_millis = (uint32_t)(go - (int64_t)NOV7 * 1000) + 5000; // 5 s after the start time
+  f1Tick();
+  CHECK_EQ(race.clockMs, START + 5000);
+
+  // Set after loading too; another board started later lands on the same moment
+  f1StartAt(go - 10000);
+  f1Tick();
+  CHECK_EQ(race.clockMs, START + 15000);
+  f1StartAt(0); // off: back to looping with the clock
+  f1Tick();
+  CHECK_EQ(race.clockMs, START + 15000); // keeps the moment it had
 }
 
 static void test_race_story()
@@ -1064,6 +1092,7 @@ int main()
   test_net();
   test_loading();
   test_replay_sync();
+  test_start_at();
   test_race_story();
   test_join_mid_race();
   test_news_ring();

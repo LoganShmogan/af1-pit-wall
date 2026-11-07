@@ -131,11 +131,19 @@ extern F1Race race;
 
 #define F1_NEWS_KEEP 32 // f1News() keeps the most recent 32
 
+// Replay start time (UTC, "2026-11-07T02:00:00"). When set, every board holds the grid until then and
+// starts the race from the beginning at that moment, so a test run starts together. "" = the replay
+// just loops in step with the clock. Set it at build time: -DF1_REPLAY_START=\"...\"
+#ifndef F1_REPLAY_START
+#define F1_REPLAY_START ""
+#endif
+
 // sessionKey 0 = latest finished Race. speed 1 = real time. feeds = F1Feed flags OR'd together.
 void f1Begin(long sessionKey, int speed, uint16_t feeds);
 void f1Tick();                        // call every loop (cheap; downloads run in the background)
 void f1SetSpeed(int speed);           // keeps the current race moment
 void f1Restart();                     // back to the session start (this board only)
+void f1StartAt(int64_t utcMs);        // start the race from the beginning at this moment (0 = off)
 F1Driver *f1DriverAt(int pos);        // nullptr if nobody is in that position
 F1Driver *f1Driver(int num);          // by car number, nullptr if unknown
 const F1News *f1News(uint32_t seq);   // nullptr if not happened yet or too old

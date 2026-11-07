@@ -93,6 +93,7 @@ static long wantKey = 0;
 static uint16_t feeds = 0;
 static int speed = 1;
 static int64_t offset = 0; // clock = start + ((now * speed + offset) mod span)
+static int64_t startAt = 0; // f1StartAt(): hold the grid until then, then race from the start
 static enum { LOAD_SESSION, LOAD_DRIVERS, LOAD_FEEDS, PLAYING } stage = LOAD_SESSION;
 static int loadIdx = 0;
 static uint32_t nextReqAt = 0;
@@ -389,6 +390,7 @@ static void startPlaying()
   race.ready = true;
   race.status[0] = 0;
   lastClock = INT64_MAX; // first play() starts from the top
+  if (startAt) f1StartAt(startAt);
 }
 
 static void loadSession()
@@ -740,7 +742,8 @@ static int64_t span() { return race.endMs - race.startMs; }
 
 static void play()
 {
-  int64_t clock = race.startMs + (af1NowMs() * speed + offset) % span(); // offset keeps this >= 0
+  int64_t now = af1NowMs();
+  int64_t clock = now < startAt ? race.startMs : race.startMs + (now * speed + offset) % span(); // offset keeps this >= 0
   LOCK();
   if (clock < lastClock) resetRace(); // looped round or restarted: replay from the top
   lastClock = race.clockMs = clock;
@@ -770,6 +773,7 @@ void f1Begin(long sessionKey, int s, uint16_t f)
   speed = s;
   feeds = f;
   offset = 0;
+  startAt = af1ParseIso(F1_REPLAY_START);
   if (!ev)
   {
     ev = (Ev *)ps_malloc(EV_MAX * sizeof(Ev));
@@ -847,4 +851,10 @@ const char *f1TrackName(F1Track t)
 {
   static const char *names[] = {"", "GREEN", "VIRTUAL SAFETY CAR", "SAFETY CAR", "RED FLAG", "CHEQUERED FLAG"};
   return t <= TRACK_CHEQUERED ? names[t] : "";
+}
+
+void f1StartAt(int64_t utcMs)
+{
+  startAt = utcMs;
+  if (race.ready && utcMs) offset = span() - (utcMs * speed) % span(); // the clock reads the session start at utcMs
 }

@@ -221,6 +221,9 @@ void af1NetBegin(const char *hostname)
   WiFi.setAutoReconnect(true);
   WiFi.setSleep(false);
   WiFi.begin(WIFI_NAME, WIFI_PASSWORD);
+  // At full power one of the boards was never let in (router: "auth expired", reason 2);
+  // at 8.5 dBm it joins at once. The boards sit near the router, so nothing is lost.
+  WiFi.setTxPower(WIFI_POWER_8_5dBm);
   wifiTryAt = millis();
   Serial.printf("Wifi: joining %s\n", WIFI_NAME);
 }
