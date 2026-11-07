@@ -12,6 +12,7 @@
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
+#include <miniz.h> // the ESP32 ROM decompressor (tinfl)
 
 #ifdef ARDUINO
 #define LOCK() xSemaphoreTake(lock, portMAX_DELAY)
@@ -125,28 +126,96 @@ static void isoOf(int64_t ms, char *out, size_t n)
            t.tm_hour, t.tm_min, t.tm_sec, (int)(ms % 1000));
 }
 
-// ---------- HTTP: stream a JSON array one element at a time ----------
+// ---------- HTTP ----------
+// Replies are fetched gzip-compressed (15-30x smaller): the board's link to OpenF1 is slow
+// (about 350 ms round trip from NZ, and the ESP32 only accepts ~5.7 KB per round trip).
+// The whole reply goes into PSRAM, is unzipped with the ESP32's ROM decompressor, then parsed.
+
+// Collects a reply in PSRAM
+struct Sink : Stream
+{
+  char *buf = nullptr;
+  size_t len = 0, cap = 0;
+  size_t write(uint8_t c) { return write(&c, 1); }
+  size_t write(const uint8_t *p, size_t n)
+  {
+    if (len + n > cap)
+    {
+      cap = (len + n) * 2;
+      buf = (char *)ps_realloc(buf, cap);
+    }
+    memcpy(buf + len, p, n);
+    len += n;
+    return n;
+  }
+  int available() { return 0; }
+  int read() { return -1; }
+  int peek() { return -1; }
+};
+
+// Gzip -> plain text, in place. Returns false if it's damaged. Plain replies are left alone.
+static bool gunzip(char *&buf, size_t &len)
+{
+  const uint8_t *b = (const uint8_t *)buf;
+  if (len < 2 || b[0] != 0x1f || b[1] != 0x8b) return true;
+  if (len < 18 || b[3] != 0) return false; // ponytail: OpenF1 (nginx) never sends the optional gzip fields
+  size_t size = b[len - 4] | b[len - 3] << 8 | b[len - 2] << 16 | (size_t)b[len - 1] << 24;
+  if (size > 4000000) return false; // no reply is this big: damaged
+  char *out = (char *)ps_malloc(size + 1);
+  size_t got = tinfl_decompress_mem_to_mem(out, size, b + 10, len - 18, 0);
+  free(buf);
+  buf = out;
+  len = got;
+  return got == size;
+}
+
+// Reads a JSON array in memory one element at a time (keeps ArduinoJson's memory use tiny)
+struct MemReader
+{
+  const char *p, *end;
+  int read() { return p < end ? (uint8_t)*p++ : -1; }
+  size_t readBytes(char *out, size_t n)
+  {
+    size_t k = 0;
+    for (; k < n && p < end; k++) out[k] = *p++;
+    return k;
+  }
+};
+
+static void parse(const char *json, size_t len, JsonDocument &filter, ElemCb cb)
+{
+  MemReader r{json, json + len};
+  int c;
+  while ((c = r.read()) >= 0 && c != '[') {} // up to the start of the array
+  while (c >= 0)
+  {
+    JsonDocument d;
+    if (deserializeJson(d, r, DeserializationOption::Filter(filter))) break;
+    cb(d);
+    while ((c = r.read()) >= 0 && c != ',' && c != ']') {} // to the next element, or the end
+    if (c != ',') break;
+  }
+}
+
 // Returns HTTP code (200 ok, 404 = OpenF1's "no results"), or <0 on network error.
 static int get(const char *url, JsonDocument &filter, ElemCb cb)
 {
   static WiFiClientSecure tls;
   tls.setInsecure(); // ponytail: public read-only data; pin the CA cert if this ever sends a token
   HTTPClient http;
-  http.useHTTP10(true); // no chunked replies, so ArduinoJson can read the stream directly
+  http.setAcceptEncoding("gzip");
   http.setTimeout(15000);
   if (!http.begin(tls, url)) return -1;
   int code = http.GET();
   Serial.printf("GET %s -> %d\n", url, code);
   if (code == 200)
   {
-    Stream &s = http.getStream();
-    if (s.find("["))
-      do
-      {
-        JsonDocument d;
-        if (deserializeJson(d, s, DeserializationOption::Filter(filter))) break;
-        cb(d);
-      } while (s.findUntil(",", "]"));
+    Sink reply;
+    int n = http.writeToStream(&reply); // handles chunked replies and waits for the network
+    if (n < 0) code = n;
+    else if (!gunzip(reply.buf, reply.len)) code = HTTPC_ERROR_READ_TIMEOUT; // cut off part-way
+    else parse(reply.buf, reply.len, filter, cb);
+    free(reply.buf);
   }
   http.end();
   return code;
@@ -709,7 +778,7 @@ void f1Begin(long sessionKey, int s, uint16_t f)
     staging = (Ev *)ps_malloc(STAGING_MAX * sizeof(Ev));
 #ifdef ARDUINO
     lock = xSemaphoreCreateMutex();
-    xTaskCreatePinnedToCore(loaderTask, "f1load", 16384, nullptr, 1, nullptr, 0);
+    xTaskCreatePinnedToCore(loaderTask, "f1load", 24576, nullptr, 1, nullptr, 0); // TLS + ROM unzip (~11 KB stack)
 #endif
   }
   uint32_t newsCount = race.newsCount; // news numbers keep counting up so boards don't re-show old items

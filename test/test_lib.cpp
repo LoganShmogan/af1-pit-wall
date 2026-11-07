@@ -862,6 +862,73 @@ static void test_load_errors()
   CHECK(strstr(race.status, "Can't reach OpenF1") != nullptr);
 }
 
+static std::string loadedLine()
+{
+  size_t i = fake_serial.find("Loaded ");
+  return i == std::string::npos ? "" : fake_serial.substr(i, fake_serial.find('\n', i) - i);
+}
+
+// OpenF1 sends gzip when asked (15-30x smaller, which the board's slow link needs)
+static void test_gzip()
+{
+  resetFakes();
+  routeRace();
+  f1Begin(0, 1, ALL_LOADS);
+  loadAll();
+  std::string plain = loadedLine();
+  CHECK_STR(fake_accept_encoding, "gzip");
+
+  resetFakes();
+  fake_gzip = true;
+  routeRace();
+  f1Begin(0, 1, ALL_LOADS);
+  loadAll();
+  CHECK(race.ready);
+  CHECK(!plain.empty());
+  CHECK_STR(loadedLine(), plain); // exactly the same race
+
+  // Spaces between items are fine; a reply that stops part-way keeps what arrived
+  resetFakes();
+  route("drivers?", 200, "[ {\"driver_number\":1} ,\n {\"driver_number\":2} ]");
+  route("laps?", 200, "[{\"driver_number\":1,\"lap_number\":7,\"date_start\":\"2026-11-01T20:03:01+00:00\"}");
+  routeRace();
+  f1Begin(0, 1, F1_LAPS);
+  loadAll();
+  CHECK(race.ready);
+  CHECK_EQ(race.driverCount, 2);
+  CHECK_EQ(race.totalLaps, 7);
+}
+
+// Damaged gzip replies are errors (and are fetched again), never a crash
+static void expectBadReply(const std::string &body, int writeError, const char *status = "Can't reach OpenF1")
+{
+  resetFakes();
+  route("sessions?", 200, body);
+  routeRace();
+  fake_write_error = writeError;
+  f1Begin(0, 1, F1_LAPS);
+  f1Tick();
+  CHECK(!race.ready);
+  CHECK(strstr(race.status, status) != nullptr);
+}
+
+static void test_bad_replies()
+{
+  std::string good = fakeGzip(SESSIONS);
+  std::string cut = good.substr(0, good.size() - 30); // connection dropped part-way
+  std::string flags = good;
+  flags[3] = 8; // has a file name field
+  std::string huge = good;
+  huge[huge.size() - 1] = 0x7F; // claims to be ~2 GB
+  expectBadReply(cut, 0);
+  expectBadReply(flags, 0);
+  expectBadReply(good.substr(0, 12), 0); // too short to be gzip
+  expectBadReply(huge, 0);
+  expectBadReply(SESSIONS, HTTPC_ERROR_READ_TIMEOUT);
+  expectBadReply("\x1f", 0, "No session data");  // one byte: not gzip, not JSON either: an empty reply
+  expectBadReply("\x1fX", 0, "No session data"); // starts like gzip but isnt
+}
+
 static void test_limits()
 {
   // More rows than there's room for: the extra ones are dropped, nothing breaks
@@ -1004,6 +1071,8 @@ int main()
   test_locations();
   test_stream_buffer_full();
   test_load_errors();
+  test_gzip();
+  test_bad_replies();
   test_limits();
   test_more_locations();
   test_checkpoint_sketch();

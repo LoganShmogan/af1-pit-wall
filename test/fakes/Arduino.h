@@ -35,6 +35,7 @@ inline void delay(uint32_t ms) { fake_millis += ms; }
 inline void pinMode(int, int) {}
 inline void digitalWrite(int pin, int v) { fake_pins[pin] = v; }
 inline void *ps_malloc(size_t n) { return malloc(n); }
+inline void *ps_realloc(void *p, size_t n) { return realloc(p, n); }
 #define PROGMEM
 #define pgm_read_byte(p) (*(const uint8_t *)(p))
 template <typename T> T constrain(T v, T lo, T hi) { return v < lo ? lo : v > hi ? hi : v; }
@@ -82,6 +83,8 @@ class Stream
 public:
   std::string data;
   size_t at = 0;
+  virtual ~Stream() {}
+  virtual size_t write(const uint8_t *, size_t n) { return n; } // overridden by sinks
   size_t readBytes(char *buf, size_t n)
   {
     size_t k = std::min(n, data.size() - at);

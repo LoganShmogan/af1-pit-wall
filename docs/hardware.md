@@ -69,3 +69,13 @@ Red and blue came out right on all boards. If a future board shows them swapped,
 | Albert Park map test (RGB565 header) | Displayed correctly |
 | Map Board v1 – all 23 maps as PNG, tap/swipe | Would have failed: PNGdec 1.1.6 can't decode a 480-wide colour PNG (its line buffer is too small), so maps are now stored as left/right halves. Replaced by `MapBoard/` |
 | Job 3 wifi clock, v1 Foundation (replay) | Compiles; not yet run. Replaced by `AF1` + `CheckpointA` |
+| MapBoard on the middle board (7 Nov 2026) | Runs: joins wifi, loads the Mexico replay (22 drivers, 71 laps) in about 25 s, car positions keep up at 1x |
+
+## Network lessons from the real board
+
+- **The ESP32's TLS client doesn't wait for data.** In core 3.3.12, `NetworkClientSecure::readBytes()` returns
+  nothing as soon as the next packet hasn't arrived, so streaming JSON straight from it stopped part-way through
+  every big reply. `F1Data.cpp` lets `HTTPClient::writeToStream()` collect the whole reply instead.
+- **The link to OpenF1 is slow:** about 350 ms round trip from NZ, and the ESP32 only accepts about 5.7 KB per
+  round trip, so roughly 15 KB/s. Replies are therefore requested **gzip** (15–30x smaller; OpenF1 only
+  compresses over HTTP/1.1) and unzipped with the ESP32's ROM decompressor (`tinfl` in `miniz.h`).

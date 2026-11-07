@@ -12,10 +12,10 @@ PNGDEC ?= $(HOME)/Arduino/libraries/PNGdec/src
 TEST := $(CURDIR)
 ROOT := $(abspath $(TEST)/..)
 CXXFLAGS := -std=gnu++17 -O0 -g --coverage -Wall -Wno-unused-function \
-  -I$(TEST)/fakes -I$(ROOT)/AF1/src -I$(abspath $(ARDUINOJSON)) -I$(abspath $(PNGDEC)) \
+  -I$(TEST)/fakes -I$(ROOT)/AF1/src -I$(abspath $(ARDUINOJSON)) -idirafter $(abspath $(PNGDEC)) \
   -DARDUINOJSON_ENABLE_ARDUINO_STREAM=1 -DARDUINOJSON_ENABLE_ARDUINO_STRING=0 \
   -DARDUINOJSON_ENABLE_ARDUINO_PRINT=0 -DARDUINOJSON_ENABLE_PROGMEM=0
-LDFLAGS := --coverage -Wl,--wrap=time,--wrap=gettimeofday
+LDFLAGS := --coverage -Wl,--wrap=time,--wrap=gettimeofday -lz
 LIB := $(ROOT)/AF1/src/AF1.cpp $(ROOT)/AF1/src/F1Data.cpp $(TEST)/fakes/fakes.cpp
 HEADERS := $(wildcard $(TEST)/fakes/*.h) $(ROOT)/AF1/src/AF1.h
 
