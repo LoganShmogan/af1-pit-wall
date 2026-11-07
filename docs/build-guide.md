@@ -1,6 +1,6 @@
 # AF1 Dashboard – Build Guide
 
-Nov 7, 2026
+Nov 7, 2026 · progress updated the same day (section 11). What is built lives in the repo README and each board folder.
 
 ## 1. Project overview
 
@@ -73,37 +73,39 @@ Each of the three screens is its own ESP32-S3 with its own program; they all fet
 
 ## 4. Dev setup and memory budget
 
-The toolchain is already proven: the developer has run Job 1 (text on screen) and Job 2 (touch test) on the real boards, and the Albert Park map has displayed correctly.
+The toolchain is proven on the real boards: Jobs 1–2, and all three board sketches running a replay (7 Nov 2026).
 
 **Arduino settings (all three boards):**
 
 | Setting | Value | Note |
 | --- | --- | --- |
-| IDE | Arduino IDE 1.8.19 | Works; IDE 2 not needed |
-| Board | ESP32S3 Dev Module |  |
+| IDE | Arduino IDE 2.3.10 (1.8.19 also works) | Libraries: GFX Library for Arduino 1.6.9, ArduinoJson 7.4.x, PNGdec 1.1.6, plus `AF1` from the repo |
+| Board | ESP32S3 Dev Module | esp32 core 3.3.12 |
 | USB CDC On Boot | Enabled | Critical: black screen and silent serial if Disabled |
 | PSRAM | OPI PSRAM |  |
-| Port (Linux Mint) | /dev/ttyACM0 | Native USB |
+| Flash Size | 16MB (128Mb) |  |
+| Partition Scheme | Default; **Custom** for the map board | Without Custom the map board fails with "Sketch too big" |
+| Port (Linux Mint) | /dev/ttyACM0 (sometimes ttyACM1) | Native USB |
 
-**Screen driver:** the ST77922 is not supported by Arduino\_GFX or other common libraries. Use LCDwiki's own init sequence and QSPI code from their Example\_01\_Simple\_test demo (29 demos are in the maker's Downloads > F1 RACING folder). Pins: QSPI data 9/11/12/13/14, CS 10, backlight 41. Wrap this once in a shared `display` module and reuse it on all three boards.
+**Screen driver:** the ST77922 is not supported by Arduino\_GFX directly. It runs through `Arduino_ST77916` with LCDwiki's own init sequence, wrapped once in the shared `AF1` library.
 
-**Suggested shared code (one library, three sketches):**
+**Shared code (one library, three sketches), as built:**
 
-- `display` - LCDwiki init, drawing, image blit from flash.
-- `touch` - capacitive touch reads, tap and hold events.
-- `net` - WiFi connect, reconnect, NTP time (NZ time zone).
-- `f1data` - OpenF1 polling and parsing into one shared race-state struct.
-- `link` - ESP-NOW messages between boards.
-- `settings` - saves layer toggles, pins, volume across power-off (NVS/Preferences).
+- `AF1/src/AF1.cpp` – screen, touch (tap, hold, swipes), WiFi + NZ clock. Done.
+- `AF1/src/F1Data.cpp` – OpenF1 replay into one shared race struct: order, laps, tyres, gaps, pits, race control, weather, car x/y and a news feed of big moments. Downloads run in the background on the second core; every board computes the same replay moment from the internet clock. Done.
+- `link` (ESP-NOW between boards) – not yet (Job 15).
+- `settings` (saved toggles, pins, volume) – not yet (Job 10).
 
 **File formats:**
 
-- Maps and images: byte-swapped RGB565 header files (proven working on the board). One 480x320 map is about 300 KB.
+- Maps: the signed-off PNGs, stored in flash as a left and a right half each (the PNG decoder can't buffer a full 480-pixel colour line). `tools/build_maps.py` makes them and fits each map to real OpenF1 car positions.
 - Audio: MP3, never WAV, to keep it small.
 
-**Memory budget (16 MB flash per board):** 23 maps + program about 8 MB; all audio as MP3 about 1.5 MB (commentary about 0.57 MB, effects about 0.8 MB). Total under 10 MB, about 6 MB spare. Show one map at a time; 8 MB PSRAM is free for frame buffers and the zoom view.
+**Memory budget (16 MB flash per board):** the map board program with all 23 maps is 3.9 MB (custom partition: 12 MB app space). Standings and drama are about 1.1 MB each. Audio as MP3 about 1.5 MB. PSRAM holds the frame buffer, a copy of the map and the race data.
 
 ## 5. Data sources
+
+**Update (7 Nov 2026):** everything is built and tested on Option C. Since about 15 Oct 2026, F1's own past-race archive needs an F1 TV login, but F1's live timing feed is still free without a login for everything except car x/y positions. That gives a fourth, free option (D: real timing, estimated car positions). Details and sources: [data-sources.md](data-sources.md).
 
 **Decision needed first:** OpenF1 is free only for historical data. Live data during a session needs a logged-in OpenF1 account ([OpenF1 auth guide](https://openf1.org/auth.html)), which is a paid Sponsor tier. A third-party listing puts it at about EUR 9.90 and says the free data opens up from 30 minutes after a session ends ([listing](https://freeapihub.com/apis/openf1-api)). Check openf1.org for the current price and billing period. This affects the "no paid APIs" rule and the earlier "free estimated positions" plan.
 
@@ -279,54 +281,54 @@ The boards switch mode on their own from the session schedule; nobody picks a mo
 
 ## 11. Build order and checklist
 
-Build one working slice at a time and test on the real boards before moving on. Jobs 1 and 2 are already done.
+Build one working slice at a time and test on the real boards before moving on. ✅ = done and running on the real boards; 🟡 = partly done (notes say what's left).
 
-**Phase 1: Foundation**
+**Phase 1: Foundation** ✅
 
-- [x] Job 1: text on screen (done)
-- [x] Job 2: touch test (done)
-- [ ] Job 3: shared `display` + `touch` modules from the LCDwiki code, used by all boards
-- [ ] Job 4: WiFi connect/reconnect + NZ time via NTP; clock shows on screen
-- [ ] Job 5: `f1data` layer that can replay a past race from free OpenF1 data at real speed (source swappable later)
+- [x] Job 1: text on screen
+- [x] Job 2: touch test
+- [x] Job 3: shared `display` + `touch` code in the `AF1` library, used by all boards
+- [x] Job 4: WiFi connect/reconnect + NZ time via NTP
+- [x] Job 5: `F1Data` replays a past race from free OpenF1 data at real speed (`CheckpointA` sketch)
 
-**Checkpoint A:** The maker sees the correct clock and a replayed race's lap count ticking on a board.
+**Checkpoint A:** passed on the boards.
 
-**Phase 2: Map board**
+**Phase 2: Map board** 🟡
 
-- [ ] Job 6: convert 23 maps to RGB565 headers; load the right map for a session; scroll through maps when idle
-- [ ] Job 7: calibrate OpenF1 x/y to each map image (start with Albert Park)
-- [ ] Job 8: car icons in team colours moving in replay, plus order strip and tyre icons
-- [ ] Job 9: podium rings, battle rings, crash ripple, safety car beacon
+- [x] Job 6: all 23 maps in flash; the right map loads by itself; tap/swipe through them when idle
+- [x] Job 7: OpenF1 x/y fitted to every map automatically (`tools/build_maps.py`, overview in `docs/map-fits.jpg`)
+- [x] Job 8: cars in team colours moving in the replay, order strip, tyre dots (dots for now, not car icons)
+- [x] Job 9: podium rings, battle rings, crash ripple, safety car beacon, red-flag banner
 - [ ] Job 10: layer toggles + menu icon, saved across power-off
-- [ ] Job 11: tap a car: swatch, halo, Follow 30 s / Stay on / Unfollow, zoom-follow
+- [ ] Job 11: tap a car: swatch, halo, Follow 30 s / Stay on / Unfollow, zoom-follow (tap shows code + position for now)
 
-**Checkpoint B:** The maker signs off the map board look during a full replayed race.
+**Checkpoint B:** running on the middle board; waiting for the maker's sign-off on the look.
 
-**Phase 3: Standings board**
+**Phase 3: Standings board** 🟡
 
-- [ ] Job 12: full list with tyres, tyre age, lap count
-- [ ] Job 13: top-3 feature view with photos
-- [ ] Job 14: driver card, race story, points flip
+- [x] Job 12: full list with gaps, tyres, tyre age, lap count
+- [x] Job 13: top-3 feature view (text and team colours; the photo space is left empty)
+- [x] Job 14: driver card and race story (no championship points flip yet: no points data source)
 - [ ] Job 15: ESP-NOW link; pin on standings shows halo on map
 
-**Checkpoint C:** two boards working together in a replay.
+**Checkpoint C:** both boards run the same replay in step (synced by the internet clock, no link needed); pinning waits for Job 15.
 
-**Phase 4: Drama board**
+**Phase 4: Drama board** 🟡
 
-- [ ] Job 16: check in-box speaker (speaker or buzzer); wire amp if needed; play one MP3
-- [ ] Job 17: event feed (gaps, weather, fastest lap, pits, flags)
-- [ ] Job 18: event-to-sound mapping and Ryan's lines, no overlapping audio, volume + mute
-- [ ] Job 19: incident card and 30 s battle/crash close-up
-- [ ] Job 20: drama touch features
+- [ ] Job 16: check in-box speaker; play one MP3. The board has its own amp (ES8311 codec + FM8002E), see [hardware.md](hardware.md)
+- [x] Job 17: event feed (lap, track status, fight for the lead, fastest lap, fastest pit, weather, news)
+- [x] Job 18 (part): each event picks its commentary clip and logs it; no overlap, mute button. Playback comes with Job 16
+- [x] Job 19 (part): incident cards (crash, red flag, SC/VSC) and lead/fastest-lap banners; no battle close-up yet
+- [x] Job 20 (part): tap a news item to reopen it, mute, toy crash button
 
-**Checkpoint D:** all three boards through a full replayed race; the maker signs off sound.
+**Checkpoint D:** all three boards run the same replay on the hardware; sound waits for Job 16.
 
 **Phase 5: Modes and polish**
 
 - [ ] Job 21: idle/attract show synced across three boards
 - [ ] Job 22: practice and qualifying modes (hot-lap pulse, live sector colours, close-up screen)
 - [ ] Job 23: AF1 badge and secret message for the user
-- [ ] Job 24: switch the data source to live (Option A or B, section 5)
+- [ ] Job 24: switch the data source to live (section 5)
 - [ ] Job 25: test live at a real practice session, then a race
 
 **Phase 6: Stand (can run alongside, maker)**
@@ -341,7 +343,7 @@ Everything belongs in the maker's Documents > F1 Dashboard folder. A few items a
 
 | Asset | Where it is now | Notes |
 | --- | --- | --- |
-| Season maps v4 (23 PNG, signed off) | F1 Media folder; also [v4 zip](https://assets.macaly-user-data.dev/t0mna8wnmvqzfjwlwxbyybix/iv53ofeid9nqqivc07ufpy72/iuOtTWOM0yXUS9M5EEhML/f1-season-maps-v4-JuOgHT8t.zip) | Convert to RGB565 headers |
+| Season maps v4 (23 PNG, signed off) | In the repo: `assets/maps/`; also [v4 zip](https://assets.macaly-user-data.dev/t0mna8wnmvqzfjwlwxbyybix/iv53ofeid9nqqivc07ufpy72/iuOtTWOM0yXUS9M5EEhML/f1-season-maps-v4-JuOgHT8t.zip) | Done: `tools/build_maps.py` builds them into `MapBoard/src/` |
 | Driver headshots (22) | F1 Media folder | Crop to head and shoulders; Lindblad placeholder |
 | Team car images (11) | F1 Media folder | Fix Cadillac visibility |
 | `drivers-2026.csv` | F1 Dashboard folder | All 22 drivers: number, team, colour, photo link |
@@ -352,7 +354,7 @@ Everything belongs in the maker's Documents > F1 Dashboard folder. A few items a
 | Spec | Google Drive: "F1 Dashboard - Spec" | 12 sections, 6 Oct 2026 |
 | Pit-wall stand v14 | With the maker | 3D print files |
 
-Suggested new folder for the code: Documents > F1 Dashboard > Board Code, with one sketch per board plus the shared library.
+The code lives in the GitHub repo: one folder per board (`StandingsBoard/`, `MapBoard/`, `DramaBoard/`) plus the shared `AF1/` library.
 
 ## 13. Risks, open questions and small to-dos
 
@@ -362,9 +364,11 @@ The biggest risk is the live data source; everything else can be built and teste
 | --- | --- | --- |
 | Live OpenF1 needs a paid account | High | The maker decides Option A or B (section 5) before Job 24 |
 | F1 TV live timing is unofficial and may change | Medium | Keep the data layer swappable; Option A as fallback |
-| Three boards hit the 30 requests/minute limit | Medium | One board fetches, shares over ESP-NOW |
-| ST77922 only works with LCDwiki code | Medium | Wrap it once in the shared `display` module |
-| Smooth car movement on a 3.5 in screen | Medium | Draw only changed areas; use PSRAM frame buffer |
+| Three boards hit the 30 requests/minute limit | Low | Measured: about 7 a minute for all three at 1x. If it grows, one board fetches and shares over ESP-NOW |
+| Slow link to OpenF1 (350 ms from NZ) | Solved | Replies are gzip-compressed (15–30x smaller); a full race loads in about 25 s |
+| ST77922 only works with LCDwiki code | Solved | Wrapped once in the `AF1` library |
+| Smooth car movement on a 3.5 in screen | Low | PSRAM frame buffer, positions smoothed between samples; check on the board |
+| Router refusing a board (wifi "reason 2") | Low | Happened once on the drama board; restarting the router fixed it |
 | Audio overlapping (two events at once) | Low | Simple queue with priorities: crash > safety car > lead change > others |
 | Heat inside the stand | Low | Rear vents already in v14 |
 

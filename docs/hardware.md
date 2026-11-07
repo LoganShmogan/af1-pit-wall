@@ -68,8 +68,10 @@ Red and blue came out right on all boards. If a future board shows them swapped,
 | Job 2 – touch dot + 4 corner targets | Passed, no flips |
 | Albert Park map test (RGB565 header) | Displayed correctly |
 | Map Board v1 – all 23 maps as PNG, tap/swipe | Would have failed: PNGdec 1.1.6 can't decode a 480-wide colour PNG (its line buffer is too small), so maps are now stored as left/right halves. Replaced by `MapBoard/` |
-| Job 3 wifi clock, v1 Foundation (replay) | Compiles; not yet run. Replaced by `AF1` + `CheckpointA` |
-| MapBoard on the middle board (7 Nov 2026) | Runs: joins wifi, loads the Mexico replay (22 drivers, 71 laps) in about 25 s, car positions keep up at 1x |
+| Job 3 wifi clock, v1 Foundation (replay) | Never run; replaced by `AF1` + `CheckpointA` |
+| MapBoard on the middle board (7 Nov 2026) | Runs: the right map, cars on the track, red-flag stop shown correctly; full Mexico replay loads in about 25 s, car positions keep up at 1x |
+| StandingsBoard on the left board (7 Nov 2026) | Runs: list, gaps, tyres and driver cards checked on screen; loads in about 16 s |
+| DramaBoard on the right board (7 Nov 2026) | Runs after a router restart (see below); all three boards show the same replay moment |
 
 ## Network lessons from the real board
 
@@ -79,3 +81,13 @@ Red and blue came out right on all boards. If a future board shows them swapped,
 - **The link to OpenF1 is slow:** about 350 ms round trip from NZ, and the ESP32 only accepts about 5.7 KB per
   round trip, so roughly 15 KB/s. Replies are therefore requested **gzip** (15–30x smaller; OpenF1 only
   compresses over HTTP/1.1) and unzipped with the ESP32's ROM decompressor (`tinfl` in `miniz.h`).
+
+## Flashing and troubleshooting
+
+| What you see | Cause | Fix |
+| --- | --- | --- |
+| "Sketch too big" / "text section exceeds available space" (map board) | Default partition only has 1.3 MB for the program; the maps need 3.9 MB | Tools > Partition Scheme > **Custom**, Flash Size > **16MB** |
+| Black screen and silent serial right after flashing or reading the board with `esptool` | The S3 stayed in download mode; a USB "RTS" reset doesn't bring it out | Press the board's RST button, or `esptool --port /dev/ttyACM0 --after watchdog-reset chip-id` |
+| Port is `/dev/ttyACM1` instead of `ttyACM0` | The old port was still held when the board came back | Pick the new port in Tools > Port |
+| Serial says "Wifi: still down, trying again" forever, signal fine | The router refuses the board (disconnect reason 2, "auth expired") | Restart the router; check it isn't blocking new devices (MAC filter, device limit) |
+| Serial log | 115200 baud | Every OpenF1 request and the "Loaded …" summary are printed |

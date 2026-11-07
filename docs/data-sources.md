@@ -48,6 +48,17 @@ Sources: [FastF1 #978](https://github.com/theOehrly/Fast-F1/issues/978),
 I couldn't confirm OpenF1's Sponsor price from an official page (a third-party listing says EUR 9.90; the
 OpenF1 request form says usage-based).
 
+## How the boards fetch (as built)
+
+- **Once per race**, in the background: session, drivers, then the feeds a board asked for (laps, positions,
+  tyres, pits, race control, weather). Loads in about 16–25 s on the boards.
+- **Streamed** just ahead of the replay clock: gaps (`intervals`, 60 s windows) and car positions (`location`,
+  15 s windows, map board only).
+- **Request budget** at replay speed 1: about 7 requests a minute for all three boards together, well under the
+  free tier's ~30. At higher replay speeds the map's car positions can fall behind and skip ahead.
+- **Gzip:** every reply is requested compressed (OpenF1 only does this over HTTP/1.1). It matters because the
+  ESP32's link to OpenF1 is about 15 KB/s from NZ: a 15 s window of car positions is 161 KB plain, 5.5 KB gzip.
+
 ## What this means for the build
 
 1. **Now (Jobs 5–23):** OpenF1 free history, replayed (`AF1/src/F1Data.cpp`). Includes `location` x/y, so
